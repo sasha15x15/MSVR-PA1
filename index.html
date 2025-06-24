@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR.js Surface of Conjugation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .arjs-loader {
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 9999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .arjs-loader div {
+            text-align: center;
+            font-size: 1.25em;
+            color: white;
+        }
+
+        .status {
+            position: fixed;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="arjs-loader">
+        <div>Loading, please wait...</div>
+    </div>
+
+    <div class="status" id="status">Tracking marker...</div>
+
+    <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+    <script>
+        function updateStatus(message) {
+            document.getElementById('status').textContent = message;
+        }
+
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                document.querySelector('.arjs-loader').style.display = 'none';
+                updateStatus('Camera ready. Point at marker');
+            }, 1000);
+        });
+
+        AFRAME.registerComponent('corrugated-sphere-model', {
+            init: function () {
+                try {
+                    const geometry = new THREE.BufferGeometry();
+                    const vertices = [];
+                    const indices = [];
+
+                    const R = 1.0;          // Radius of sphere
+                    const a = 0.24;         // Maximum amplitude of crimps
+                    const n = 6;            // Number of vertices (crimps)
+                    const phiResolution = 72;
+                    const vResolution = 36;
+
+                    // Generate vertices using parametric form
+                    for (let vi = 0; vi <= vResolution; vi++) {
+                        const v = (vi / vResolution) * Math.PI;
+
+                        for (let pi = 0; pi <= phiResolution; pi++) {
+                            const phi = (pi / phiResolution) * 2 * Math.PI;
+
+                            const radiusModulation = R * Math.cos(v) + a * (1 - Math.sin(v)) * Math.cos(n * phi);
+
+                            const x = radiusModulation * Math.cos(phi);
+                            const y = radiusModulation * Math.sin(phi);
+                            const z = R * Math.sin(v);
+
+                            vertices.push(x, y, z);
+                        }
+                    }
+
+                    // Generate triangle indices
+                    for (let vi = 0; vi < vResolution; vi++) {
+                        for (let pi = 0; pi < phiResolution; pi++) {
+                            // Current vertex indices
+                            const curr = vi * (phiResolution + 1) + pi;
+                            const next = vi * (phiResolution + 1) + (pi + 1);
+                            const currNext = (vi + 1) * (phiResolution + 1) + pi;
+                            const nextNext = (vi + 1) * (phiResolution + 1) + (pi + 1);
+
+                            // Skip degenerate triangles at poles
+                            if (vi > 0) {
+                                // First triangle
+                                indices.push(curr, currNext, next);
+                            }
+
+                            if (vi < vResolution - 1) {
+                                // Second triangle  
+                                indices.push(next, currNext, nextNext);
+                            }
+                        }
+                    }
+
+                    geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                    geometry.setIndex(indices);
+                    geometry.computeVertexNormals();
+
+                    const material = new THREE.MeshLambertMaterial({
+                        color: 0xff0000,
+                        transparent: true,
+                        opacity: 0.8,
+                        side: THREE.DoubleSide
+                    });
+
+                    const mesh = new THREE.Mesh(geometry, material);
+                    this.el.setObject3D('mesh', mesh);
+
+                    const wireframeMaterial = new THREE.LineBasicMaterial({
+                        color: 0x000088,
+                        linewidth: 1
+                    });
+                    const wireframe = new THREE.LineSegments(
+                        new THREE.WireframeGeometry(geometry),
+                        wireframeMaterial
+                    );
+                    this.el.object3D.add(wireframe);
+
+                    this.el.object3D.scale.set(0.3, 0.3, 0.3);
+                    this.el.object3D.position.set(0, 0.5, 0);
+
+                    this.el.object3D.rotation.x = -Math.PI / 2;
+
+                    updateStatus('Corrugated Sphere model loaded successfully!');
+
+                } catch (error) {
+                    console.error('Error creating Corrugated Sphere model:', error);
+                    updateStatus('Error: ' + error.message);
+                }
+            },
+
+            tick: function (time, timeDelta) {
+                if (this.el.object3D) {
+                    this.el.object3D.rotation.x += 0.01;
+                }
+            }
+        });
+
+        AFRAME.registerComponent('marker-handler', {
+            schema: {
+                name: { type: 'string', default: 'marker' }
+            },
+
+            init: function () {
+                const marker = this.el;
+                const markerName = this.data.name;
+
+                marker.addEventListener('markerFound', function () {
+                    updateStatus(`${markerName} found! Displaying Corrugated Sphere.`);
+                });
+
+                marker.addEventListener('markerLost', function () {
+                    updateStatus(`${markerName} lost. Point camera at marker.`);
+                });
+            }
+        });
+    </script>
+
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix;"
+        vr-mode-ui="enabled: false">
+
+        <!-- Add some lighting for better appearance -->
+        <a-light type="ambient" color="#404040"></a-light>
+        <a-light type="directional" position="1 1 1" color="#ffffff"></a-light>
+
+        <a-marker preset="hiro" marker-handler="name: Hiro marker">
+            <a-entity corrugated-sphere-model position="0 0 0"></a-entity>
+        </a-marker>
+
+        <a-marker type="pattern" url="pattern-marker.patt" marker-handler="name: Custom marker">
+            <a-entity corrugated-sphere-model position="0 0 0"></a-entity>
+        </a-marker>
+
+        <a-entity camera></a-entity>
+    </a-scene>
+</body>
+
+</html>
