@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<title>PA#1</title>
+<style>
+    body {
+        background-color: #EEEEEE;
+    }
+</style>
+
+<script src="./Utils/trackball-rotator.js"></script>
+<script src="./Utils/m4.js"></script>
+<script src="./shader.gpu"></script>
+<script src="./Model.js"></script>
+<script src="./StereoCamera.js"></script>
+<script src="./Texture.js"></script>
+<script src="./main.js"></script>
+
+</head>
+<body onload="init()">
+
+<div style="margin-top: 20px; padding: 10px; background-color: #f0f0f0;">
+    <h3>Stereo Camera Controls</h3>
+    <div>
+        <label for="eyeSeparation">Eye Separation: <span id="eyeSepValue">0.2</span></label>
+        <input type="range" id="eyeSeparation" min="0.1" max="2.0" step="0.1" value="0.2">
+    </div>
+    <div>
+        <label for="convergence">Convergence Distance: <span id="convergenceValue">14.0</span></label>
+        <input type="range" id="convergence" min="5.0" max="30.0" step="0.5" value="14.0">
+    </div>
+    <div>
+        <label for="fieldOfView">Field of View (radians): <span id="fovValue">0.4</span></label>
+        <input type="range" id="fieldOfView" min="0.1" max="1.0" step="0.05" value="0.4">
+    </div>
+</div>
+
+<div id="canvas-holder">
+   <canvas width="600" height="600" id="webglcanvas" style="background-color:red"></canvas>
+</div>
+
+
+</body></html>
