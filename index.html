@@ -1,10 +1,60 @@
 <!DOCTYPE html>
-<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-
-<title>PA#1</title>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Practical Assigment #2</title>
 <style>
     body {
         background-color: #EEEEEE;
+        font-family: Arial, sans-serif;
+    }
+    
+    .control-panel {
+        margin-top: 20px;
+        padding: 15px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .control-group {
+        margin-bottom: 10px;
+    }
+    
+    input[type="text"] {
+        padding: 5px;
+        border: 1px solid #ccc;
+        border-radius: 3px;
+        width: 150px;
+        margin-right: 5px;
+    }
+    
+    button {
+        padding: 6px 12px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+    
+    button:hover {
+        background-color: #45a049;
+    }
+    
+    button#toggleButton {
+        background-color: #2196F3;
+    }
+    
+    button#toggleButton:hover {
+        background-color: #0b7dda;
+    }
+    
+    #connectionStatus {
+        font-weight: bold;
+        color: red;
+        margin-left: 10px;
     }
 </style>
 
@@ -19,25 +69,52 @@
 </head>
 <body onload="init()">
 
+<h2>Practical Assigment #2</h2>
+
+
+<div class="control-panel">
+    <h3>Connecting to smartphone</h3>
+    <div class="control-group">
+        <label for="phoneIP">IP-adress:</label>
+        <input type="text" id="phoneIP" placeholder="192.168.50.230" value="192.168.50.230">
+        
+        <label for="phonePort">Port:</label>
+        <input type="text" id="phonePort" placeholder="8080" value="8080">
+        
+        <button id="connectButton">Connect</button>
+        <button id="disconnectButton">Disconnect</button>
+        <span id="connectionStatus">Disconnected</span>
+    </div>
+    
+    <div class="control-group">
+        <strong>Current sensor's data:</strong> <span id="currentSensorData">-</span>
+    </div>
+    
+    <div class="control-group">
+        <label for="smoothingFactor">Smoothing value: <span id="smoothingValue">0.2</span></label>
+        <input type="range" id="smoothingFactor" min="0.1" max="1" step="0.01" value="0.2">
+    </div>
+</div>
+
 <div style="margin-top: 20px; padding: 10px; background-color: #f0f0f0;">
-    <h3>Stereo Camera Controls</h3>
+    <h3>Control of stereo camera</h3>
     <div>
-        <label for="eyeSeparation">Eye Separation: <span id="eyeSepValue">0.2</span></label>
+        <label for="eyeSeparation">Eye separation: <span id="eyeSepValue">0.2</span></label>
         <input type="range" id="eyeSeparation" min="0.1" max="2.0" step="0.1" value="0.2">
     </div>
     <div>
-        <label for="convergence">Convergence Distance: <span id="convergenceValue">14.0</span></label>
+        <label for="convergence">Convergence distance: <span id="convergenceValue">14.0</span></label>
         <input type="range" id="convergence" min="5.0" max="30.0" step="0.5" value="14.0">
     </div>
     <div>
-        <label for="fieldOfView">Field of View (radians): <span id="fovValue">0.4</span></label>
+        <label for="fieldOfView">Field of view (radian): <span id="fovValue">0.4</span></label>
         <input type="range" id="fieldOfView" min="0.1" max="1.0" step="0.05" value="0.4">
     </div>
 </div>
 
 <div id="canvas-holder">
-   <canvas width="600" height="600" id="webglcanvas" style="background-color:red"></canvas>
+   <canvas width="800" height="800" id="webglcanvas" style="background-color:red"></canvas>
 </div>
 
-
-</body></html>
+</body>
+</html>

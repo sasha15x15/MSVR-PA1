@@ -11,16 +11,26 @@ let iTextureWebCam = -1;
 
 let video;
 
-// Constructor
+let sensorWebSocket = null;
+let phoneRotationMatrix = m4.identity();
+let usingPhoneOrientation = false;
+let phoneIP = "192.168.50.230";
+let phonePort = "8080";
+let phoneDataReceived = false;
+
+
+let smoothingFactor = 0.2;
+let previousAccelData = [0, 0, 0];
+let filteredAccelData = [0, 0, 0];
+let smoothedMatrix = m4.identity();
+
 function ShaderProgram(name, program) {
     this.name = name;
     this.prog = program;
 
-    // Location of the attribute variables
     this.iAttribVertex = -1;
     this.iAttribTexCoord = -1;
     
-    // Location of the uniform variables
     this.iColor = -1;
     this.iModelViewMatrix = -1;
     this.iProjectionMatrix = -1;
@@ -30,6 +40,161 @@ function ShaderProgram(name, program) {
     this.Use = function() {
         gl.useProgram(this.prog);
     }
+}
+
+function smoothAccelData(newData) {
+    for (let i = 0; i < 3; i++) {
+        filteredAccelData[i] = smoothingFactor * newData[i] + (1 - smoothingFactor) * previousAccelData[i];
+        previousAccelData[i] = filteredAccelData[i];
+    }
+    return filteredAccelData;
+}
+
+function getRotationMatrixFromAccelerometer(accelData) {
+    try {
+        const smoothedData = smoothAccelData(accelData);
+        
+        const ax = smoothedData[0];
+        const ay = smoothedData[1];
+        const az = smoothedData[2];
+        
+        const norm = Math.sqrt(ax*ax + ay*ay + az*az);
+        if (norm === 0) return m4.identity();
+        
+        const ax_n = ax / norm;
+        const ay_n = ay / norm;
+        const az_n = az / norm;
+        
+        const pitch = Math.atan2(ay_n, az_n);
+        const roll = Math.atan2(-ax_n, Math.sqrt(ay_n*ay_n + az_n*az_n));
+        
+        const rotX = m4.xRotation(pitch);
+        const rotY = m4.yRotation(roll);
+        
+        const newMatrix = m4.multiply(rotX, rotY);
+        
+        if (!m4.equals(smoothedMatrix, m4.identity())) {
+            for (let i = 0; i < 16; i++) {
+                smoothedMatrix[i] = smoothingFactor * newMatrix[i] + (1 - smoothingFactor) * smoothedMatrix[i];
+            }
+            return smoothedMatrix;
+        } else {
+            smoothedMatrix = [...newMatrix];
+            return newMatrix;
+        }
+    } catch (error) {
+        console.error("Error in getRotationMatrixFromAccelerometer:", error);
+        return m4.identity();
+    }
+}
+
+if (!m4.equals) {
+    m4.equals = function(m1, m2) {
+        if (!m1 || !m2 || m1.length !== m2.length) return false;
+        for (let i = 0; i < m1.length; i++) {
+            if (Math.abs(m1[i] - m2[i]) > 0.000001) return false;
+        }
+        return true;
+    };
+}
+
+function connectToSensorServer() {
+    if (sensorWebSocket) {
+        sensorWebSocket.close();
+    }
+
+    const ip = document.getElementById('phoneIP').value || phoneIP;
+    const port = document.getElementById('phonePort').value || phonePort;
+    const url = `ws://${ip}:${port}/sensor/connect?type=android.sensor.accelerometer`;
+
+    console.log(`Connect to WebSocket by url: ${url}`);
+    
+    smoothedMatrix = m4.identity();
+    previousAccelData = [0, 0, 0];
+    filteredAccelData = [0, 0, 0];
+    
+    sensorWebSocket = new WebSocket(url);
+    
+    sensorWebSocket.onopen = function() {
+        console.log('WebSocket connected');
+        document.getElementById('connectionStatus').textContent = 'Connected';
+        document.getElementById('connectionStatus').style.color = 'green';
+        document.getElementById('connectButton').disabled = true;
+        document.getElementById('disconnectButton').disabled = false;
+        
+        window.setTimeout(function() {
+            if (!phoneDataReceived) {
+                document.getElementById('connectionStatus').textContent = 'Connected, but no data';
+                document.getElementById('connectionStatus').style.color = 'orange';
+            }
+        }, 3000);
+    };
+    
+    sensorWebSocket.onmessage = function(event) {
+        try {
+            let sensorData;
+            
+            try {
+                sensorData = JSON.parse(event.data);
+            } catch (e) {
+                console.log('Cannot parse data to JSON');
+                return;
+            }
+            
+            if (typeof sensorData === 'object' && !Array.isArray(sensorData)) {
+                if (sensorData.values && Array.isArray(sensorData.values)) {
+                    sensorData = sensorData.values;
+                } else if (sensorData.data && Array.isArray(sensorData.data)) {
+                    sensorData = sensorData.data;
+                }
+            }
+            
+            if (Array.isArray(sensorData) && sensorData.length >= 3) {
+                console.log('Accelerator data:', sensorData);
+                phoneDataReceived = true;
+                usingPhoneOrientation = true;
+                
+                phoneRotationMatrix = getRotationMatrixFromAccelerometer(sensorData);
+                
+                document.getElementById('currentSensorData').textContent = `[${sensorData.map(v => v.toFixed(3)).join(', ')}]`;
+            } else {
+                console.warn('Wrong format data from accelerator:', sensorData);
+            }
+        } catch (error) {
+            console.error('Error parse data:', error);
+        }
+    };
+    
+    sensorWebSocket.onerror = function(error) {
+        console.error('Error WebSocket:', error);
+        document.getElementById('connectionStatus').textContent = 'Connection error';
+        document.getElementById('connectionStatus').style.color = 'red';
+        document.getElementById('connectButton').disabled = false;
+        document.getElementById('disconnectButton').disabled = true;
+    };
+    
+    sensorWebSocket.onclose = function(event) {
+        console.log(`WebSocket connection closed. Code: ${event.code}, Reason: ${event.reason}`);
+        usingPhoneOrientation = false;
+        phoneDataReceived = false;
+        document.getElementById('connectionStatus').textContent = 'Disconnected';
+        document.getElementById('connectionStatus').style.color = 'red';
+        document.getElementById('connectButton').disabled = false;
+        document.getElementById('disconnectButton').disabled = true;
+    };
+}
+
+function disconnectFromSensorServer() {
+    if (sensorWebSocket) {
+        sensorWebSocket.close();
+        usingPhoneOrientation = false;
+        phoneDataReceived = false;
+    }
+}
+
+function updateSmoothingFactor(event) {
+    smoothingFactor = parseFloat(event.target.value);
+    document.getElementById('smoothingValue').textContent = smoothingFactor.toFixed(2);
 }
 
 /* Draws a colored cube, along with a set of coordinate axes.
@@ -67,7 +232,12 @@ function draw() {
     
     gl.enable(gl.DEPTH_TEST);
 
-    let modelView = spaceball.getViewMatrix();
+    let modelView;
+    if (usingPhoneOrientation && phoneDataReceived) {
+        modelView = phoneRotationMatrix;
+    } else {
+        modelView = spaceball.getViewMatrix();
+    }
 
     let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
     let translateToPointZero = m4.translation(0, 0, -10);
@@ -304,6 +474,11 @@ function init() {
         stereoCam.FOV = parseFloat(e.target.value);
         document.getElementById('fovValue').textContent = e.target.value;
     });
+    
+    document.getElementById('smoothingFactor').addEventListener('input', updateSmoothingFactor);
+    document.getElementById('connectButton').addEventListener('click', connectToSensorServer);
+    document.getElementById('disconnectButton').addEventListener('click', disconnectFromSensorServer);
+    document.getElementById('disconnectButton').disabled = true;
     
     spaceball = new TrackballRotator(canvas, draw, 0);
 
